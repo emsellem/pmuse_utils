@@ -24,10 +24,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.axes_rgb import make_rgb_axes, RGBAxes
 from matplotlib import cm
+import multicolorfits as mcf
 
 from .phangs_muse_init import Phangs_Muse_Info
 from .phangs_muse_config import (default_rgb_bands, default_colormap, maps_rules_dict,
-                                 maps_keyw_dict)
+                                 maps_keyw_dict, default_jwst_bands)
 
 # ------- Useful Functions ---------------
 def get_name_err_map(name):
@@ -44,13 +45,13 @@ def set_bad_value(data, bad=np.nan, badval=np.nan):
     data[data == bad] = badval
     return data
 
-def get_limits(data, spaxel_size=0.2, center_pix=None):
+def get_limits(data, pixsize=0.2, center_pix=None):
     lastp = (data.shape[1] - 1, data.shape[0] - 1)
     if center_pix is None:
         center_pix = np.array([lastp[0] / 2., lastp[1] / 2.])
-    # Returning a default limit assuming spaxels of spaxel_size
-    xlim = (np.array([0, lastp[0]]) - center_pix[0]) * spaxel_size
-    ylim = (np.array([0, lastp[1]]) - center_pix[1]) * spaxel_size
+    # Returning a default limit assuming spaxels of pixsize
+    xlim = (np.array([0, lastp[0]]) - center_pix[0]) * pixsize
+    ylim = (np.array([0, lastp[1]]) - center_pix[1]) * pixsize
     limits = [xlim[0], xlim[1], ylim[0], ylim[1]]
     return limits
 
@@ -286,17 +287,18 @@ def hist2d_sdss(logm, logsfr, logsfr_lim=[-1.0, 1.5], logm_lim=[9, 11], norm_mas
             h[i] /= double_schechter(ma[i], dm[i])
     return h, xe, ye
 
-def annotate_rgb(text=['R', 'G', 'B'], pos=[0.5,0.1], align="y", delta=0.05, 
+def annotate_rgb(text=['R', 'G', 'B'], cols=['red', 'green', 'blue'], 
+                 pos=[0.5,0.1], align="y", delta=0.05, 
                  **kwargs):
     facdpi = get_facdpi()
     fontsize = kwargs.pop("fontsize", 15) * facdpi
-    plt.figtext(pos[0], pos[1], text[1], c='green', fontsize=fontsize, ha='center', **kwargs)
+    plt.figtext(pos[0], pos[1], text[1], c=cols[1], fontsize=fontsize, ha='center', **kwargs)
     if align == 'y':
-        plt.figtext(pos[0], pos[1] + delta, text[2], c='blue', fontsize=fontsize, ha='center', **kwargs)
-        plt.figtext(pos[0], pos[1] - delta, text[0], c='red', fontsize=fontsize, ha='center', **kwargs)
+        plt.figtext(pos[0], pos[1] + delta, text[2], c=cols[2], fontsize=fontsize, ha='center', **kwargs)
+        plt.figtext(pos[0], pos[1] - delta, text[0], c=cols[0], fontsize=fontsize, ha='center', **kwargs)
     else:
-        plt.figtext(pos[0] - delta, pos[1], text[2], c='blue', fontsize=fontsize, ha='center', **kwargs)
-        plt.figtext(pos[0] + delta, pos[1], text[0], c='red', fontsize=fontsize, ha='center', **kwargs)
+        plt.figtext(pos[0] - delta, pos[1], text[2], c=cols[2], fontsize=fontsize, ha='center', **kwargs)
+        plt.figtext(pos[0] + delta, pos[1], text[0], c=cols[0], fontsize=fontsize, ha='center', **kwargs)
 
 def add_scalebar(ax, text, size, fontsize=12, weight='semibold',
                  pos=[0.18, 0.9], color='w', size_vertical=2, **kwargs):
@@ -493,6 +495,52 @@ def make_rgb(r, g, b, scale='linear', factors=[1., 1., 1.],
 
     return r, g, b, RGB
 
+def make_colorize_rgb(r, g, b, colors=['#ff1500', '#fbff00', '#03b3ff'], scale='linear', 
+        perc_rgb=None, clip_value=0., inverse=False, vmin=[None]*3, vmax=[None]*3):
+    """Make a cube from 3 images in R, G and B
+
+    Returns the RGB and individual arrays
+    Beware of the nan and 0 filtering out
+    """
+    # shape and first array in 3D
+    ny, nx = r.shape
+
+    if clip_value is not None:
+        r[r <= clip_value] = np.nan
+        g[g <= clip_value] = np.nan
+        b[b <= clip_value] = np.nan
+
+    # Returning the full arrays
+    if isinstance(scale, str) : scale = [scale]
+    if len(scale) == 1: scale = scale * 3
+    if perc_rgb is None: perc_rgb = [def_perc]
+    if len(perc_rgb) == 1 : perc_rgb = perc_rgb * 3
+#    r = get_plot_norm(r, percentiles=perc_rgb[0], scale=scale[0], vmin=vmin[0], vmax=vmax[0])(r)
+#    g = get_plot_norm(g, percentiles=perc_rgb[1], scale=scale[1], vmin=vmin[1], vmax=vmax[1])(g)
+#    b = get_plot_norm(b, percentiles=perc_rgb[2], scale=scale[2], vmin=vmin[2], vmax=vmax[2])(b)
+
+    # Transforming into RGB
+    R = mcf.greyRGBize_image(r, rescalefn=scale[0]); 
+    G = mcf.greyRGBize_image(g, rescalefn=scale[1]); 
+    B = mcf.greyRGBize_image(b, rescalefn=scale[2]); 
+
+#    # Mask all layers with nan
+#    mask2d = r.mask | g.mask | b.mask
+#    mask3d = np.repeat(mask2d[:, :, np.newaxis], 3, axis=2)
+
+    # Colorize
+    Rc = mcf.colorize_image(R, colors[0], colorintype='hex')
+    Gc = mcf.colorize_image(G, colors[1], colorintype='hex')
+    Bc = mcf.colorize_image(B, colors[2], colorintype='hex')
+
+    # Combine
+    RGB = mcf.combine_multicolor([Rc, Gc, Bc], gamma=2.2, inverse=inverse)
+
+    # RGB = R + G + B
+#    RGB = np.dstack((RGB, ~mask2d))
+
+    return r, g, b, RGB, colors
+
 def take_rules_for_plot(label, stretch='linear', zscale=False, 
                         percentiles=[5, 95], centred_cuts=False, 
                         use_defaults=True):
@@ -539,7 +587,7 @@ def make_rgb_imshow(r, g, b):
 class MuseDAPMaps(object):
     """Main class for such MAPS
     """
-    def __init__(self, targetname, phangs, version="native", **kwargs):
+    def __init__(self, targetname, phangs, version="native", jwst="anchored", **kwargs):
         """Initialise the map structure
 
         Input
@@ -555,11 +603,13 @@ class MuseDAPMaps(object):
         """
         self.targetname = targetname
         self.version = version
+        self.jwst = jwst
 
         # Folder of where the fits maps are
         self.folder_maps = kwargs.pop("folder_maps", f"{phangs.dr_folder}{version}_MAPS/")
         self.folder_images = kwargs.pop("folder_images", f"{phangs.dr_folder}{version}_IMAGES/")
-        self.suffix, self.mapsuffix = phangs.get_map_suffix(targetname, version)
+        self.folder_jwst = kwargs.pop("folder_jwst", f"{phangs.jwst_folder}{jwst}/")
+        self.suffix, self.mapsuffix, self.jwst_suffix = phangs.get_map_suffix(targetname, jwst=jwst, version=version)
 
         self.name_fits = kwargs.pop("name_fits", 
                                    (f"{self.folder_maps}{self.targetname}"
@@ -606,6 +656,52 @@ class MuseDAPMaps(object):
         self.Rdata = Rdata
         self.Gdata = Gdata
         self.Bdata = Bdata
+
+    def read_jwst_bands(self, bands=[770, 1130, 2100], jwst_band_dict=default_jwst_bands, factor=1.,
+                        clip_value=0., suffix=None):
+        """Reading 3 RGB bands
+        """
+        self.jwst_band_dict = jwst_band_dict
+        if suffix is None:
+            suffix = self.jwst_suffix
+        self.Rname = (f"{self.folder_jwst}{self.targetname.lower()}_"
+                     f"{jwst_band_dict[bands[0]]}_{suffix}.fits")
+        self.Gname = (f"{self.folder_jwst}{self.targetname.lower()}_"
+                     f"{jwst_band_dict[bands[1]]}_{suffix}.fits")
+        self.Bname = (f"{self.folder_jwst}{self.targetname.lower()}_"
+                     f"{jwst_band_dict[bands[2]]}_{suffix}.fits")
+        if not os.path.isfile(self.Rname):
+            print("ERROR: Rband file does not exist")
+            R = np.empty((0,0))
+        if not os.path.isfile(self.Gname):
+            print("ERROR: Gband file does not exist")
+            G = np.empty((0,0))
+        if not os.path.isfile(self.Bname):
+            print("ERROR: Bband file does not exist")
+            B = np.empty((0,0))
+
+        Rdata, hr = pyfits.getdata(self.Rname, header=True)
+        Gdata, hg = pyfits.getdata(self.Gname, header=True)
+        Bdata, hb = pyfits.getdata(self.Bname, header=True)
+        if Rdata.shape != Bdata.shape:
+            print("ERROR: R and B images do not have the same size")
+            Bdata = Rdata
+        if Rdata.shape != Gdata.shape:
+            print("ERROR: R and g images do not have the same size")
+            Gdata = Rdata
+
+        # Clipping ?
+        if clip_value is not None:
+            Rdata = np.clip(Rdata, clip_value, None)
+            Gdata = np.clip(Gdata, clip_value, None)
+            Bdata = np.clip(Bdata, clip_value, None)
+        self.Rdata = Rdata
+        self.Gdata = Gdata
+        self.Bdata = Bdata
+        self.jwst_r_scale = np.abs(hr['CD1_1']) * 3600.
+        self.jwst_g_scale = np.abs(hg['CD1_1']) * 3600.
+        self.jwst_b_scale = np.abs(hb['CD1_1']) * 3600.
+
 
     def _open_fits(self):
         if not self._check_namefits:

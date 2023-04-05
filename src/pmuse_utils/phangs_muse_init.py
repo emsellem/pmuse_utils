@@ -188,19 +188,19 @@ class Phangs_Muse_Info(object):
         if not self._check_muse_targetname(targetname): return
         return muse_footprint(targetname, self.mask_folder)
 
-    def get_map_suffix(self, targetname, version="native"):
+    def get_map_suffix(self, targetname, jwst="anchored", version="native"):
         if version == "native":
-            return "", "_MAPS"
+            return "", "_MAPS", jwst
         elif version == "copt":
             psf = self.dict_psf_copt[targetname]
             print(f"Copt version. For galaxy {targetname}, PSF is {psf}asec")
-            return f"_copt_{psf}asec", f"-{psf}asec_MAPS"
+            return f"_copt_{psf}asec", f"-{psf}asec_MAPS", jwst
 
     def get_muse_npix(self, targetname, ref_images_dict=default_white, 
                      version="native", verbose=False, **kwargs):
         """Just getting the shape of the reference images
         """
-        suffix, mapsuffix = self.get_map_suffix(targetname, version)
+        suffix, mapsuffix, _ = self.get_map_suffix(targetname, version)
 
         images_folder = self.dict_phangs_keywords[f"{version}_folders"][0]
         ref_imaname = (f"{images_folder}{targetname}_"

@@ -3,12 +3,14 @@
 # ============== USER DEFINED PARAM =========================
 # Version you wish to use for the input Data/Table
 BB = "1.0"
+JW = "v0p7p2"
 DR = "2.1"
 version_phangs_table = "v1p6"
 
 # Where the init py script is on your computer
 base_folder = "/home/science/PHANGS/"
 muse_subfolder =  "MUSE/"
+jwst_subfolder =  "JWST/"
 bb_subfolder = "BB_images/"
 # Where is the "Info" folder
 pyscript_folder = f"{base_folder}{muse_subfolder}pymuse_scripts/"
@@ -18,7 +20,7 @@ dr_folder = f"{base_folder}{muse_subfolder}data/DR{DR}/"
 # the values in the dictionary according to your structure 
 # but pls do not change the function itself
 def define_phangs_keywords(base_folder=base_folder,
-                           DR=DR, BB=BB, 
+                           DR=DR, BB=BB, JW=JW,
                            version_phangs_table=version_phangs_table):
     """Define the keywords needed for phangs
     """
@@ -33,6 +35,7 @@ def define_phangs_keywords(base_folder=base_folder,
             "wfi_folder" : f"{base_folder}{bb_subfolder}/DR{BB}/WFI_images/",
             "dp_folder" : f"{base_folder}{bb_subfolder}/DR{BB}/DuPont_images/",
             "muse_folder": f"{base_folder}{muse_subfolder}",
+            "jwst_folder": f"{base_folder}{jwst_subfolder}/{JW}/",
             "dr_folder" : dr_folder,
             "mask_folder" : f"{base_folder}{muse_subfolder}data/DR{DR}/masks/",
             "muse_info_folder" : f"{pyscript_folder}Info/DR{DR}/",
@@ -44,6 +47,10 @@ def define_phangs_keywords(base_folder=base_folder,
 # ============= MAPS  =======================================
 # For colours
 default_rgb_bands = {'R': "SDSS_i", 'G': "SDSS_r", 'B': "SDSS_g"}
+jwst_lambda = [300, 335, 360, 770, 1000, 1130, 2100]
+default_jwst_bands = {}
+for l in jwst_lambda:
+    default_jwst_bands[l] = f"F{l}W"
 default_white = {'white': "white"}
 
 default_colormap = "viridis"
